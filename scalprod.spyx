@@ -1,0 +1,77 @@
+# 
+# scalprod.spyx: faster implementation of ciphertext expand
+#
+# Copyright (c) 2012 Jean-Sebastien Coron <jean-sebastien.coron@uni.lu> 
+# and Mehdi Tibouchi <mehdi.tibouchi@normalesup.org>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 2 as published
+# by the Free Software Foundation.
+
+cimport sage.rings.integer
+from sage.misc.misc import cputime
+
+cdef extern from "directscal.c":
+  unsigned long directScal(unsigned long, mpz_t, mpz_t)
+  unsigned getGMP_NUMB_BITS()
+
+def directProd(c,y,kap):
+  cdef sage.rings.integer.Integer yz=<sage.rings.integer.Integer>y
+  cdef sage.rings.integer.Integer cz=<sage.rings.integer.Integer>c
+  return ZZ(directScal(kap, cz.value, yz.value)) >> (getGMP_NUMB_BITS()-32)
+
+from libc.stdlib cimport calloc
+from sage.all import ZZ
+
+def partialProd(c,y,kap):
+  """Computes (c*y) / 2^(kap+1), but only the w=sizeof(int)/2 bits after the binary point. We assume that c<2^kap and y<2^(kap+1), and that kap+1 is a multiple of w"""
+ 
+  # We first convert c and y to a sequence of sizeof(int)=32 words, 
+  # with the least significant bit word first.
+  # We only store sizeof(int)/2=16 bits of data in every word.
+
+  cdef int w=sizeof(int)*4  # size of half-word in bits (16 bits)
+  cdef int nw=(kap+1)/w     # maximum number of half-words in y
+  
+  assert nw*w==kap+1
+
+  cdef sage.rings.integer.Integer yz=<sage.rings.integer.Integer>y
+  cdef size_t ny # number of words written
+  cdef unsigned int* yw=<unsigned int*> calloc(nw,sizeof(int))
+  cdef int order=-1  # least significant word first
+  cdef int endian=0 # native endianness
+  cdef size_t nails=sizeof(int)*4  # half of the MSB of each word are set to 0
+  mpz_export(yw,&ny,order,sizeof(int),endian,nails,yz.value)
+  assert ny<=nw
+
+  cdef sage.rings.integer.Integer cz=<sage.rings.integer.Integer>c
+  cdef size_t nc
+  cdef unsigned int* cw=<unsigned int*> calloc(nw,sizeof(int))
+  mpz_export(cw,&nc,order,sizeof(int),endian,nails,cz.value)
+       
+  assert nc<=nw
+
+  cdef unsigned int i
+  cdef unsigned int val=0
+  for i from 0 <= i < (nw-2):
+    val+=cw[i]*((yw[nw-1-i] << w) + yw[nw-2-i])+((cw[i]*yw[nw-3-i]) >> w)
+ 
+  val+=cw[nw-2]*((yw[nw-1-(nw-2)] << w)+yw[nw-2-(nw-2)])+cw[nw-1]*(yw[nw-1-(nw-1)] << w)
+  free(cw)
+  free(yw)
+
+  return ZZ(val)
+
+def testPartialProd():
+  kap=(ZZ(1) << 20)-1
+  u=10
+  y=ZZ.random_element(ZZ(1) << kap)
+  c=ZZ.random_element(ZZ(1) << kap)
+  import time
+  t=cputime(subprocesses=True)
+  print "slowprod=",(((c*y) >> (kap+1-u)) & ((ZZ(1) << u)-1)),cputime(subprocesses=True)-t
+  t=cputime(subprocesses=True)
+  print "fastprod=",partialProd(c,y,kap) >> (sizeof(int)*8-u),cputime(subprocesses=True)-t
+  t=cputime(subprocesses=True)
+  print "directprod=",directProd(c,y,kap) >> (sizeof(mp_limb_t)*8-u),cputime(subprocesses=True)-t
+
