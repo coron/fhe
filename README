@@ -71,13 +71,13 @@ refresh.
 
 Gentry's key idea to refresh a ciphertext is to homomorphically
 evaluate the decryption circuit on the ciphertext bits, using an
-encryption of the secret-key bits. Then instead of getting the
-plaintext bit (as we would get if we would evaluate the decryption
-circuit with the secret-key bits in clear), we get an __encryption__ of
-the plaintext bit, i.e. a new ciphertext for the same plaintext. Now
-if the decryption circuit has a small enough depth, then the amount of
-noise in the new ciphertext can be actually smaller than in the
-original plaintext, hence a ciphertext refresh.
+encryption of the secret-key bits. This is called bootstrapping. 
+Then instead of getting the  plaintext bit (as we would get if we 
+would evaluate the decryption circuit with the secret-key bits in
+clear), we get an __encryption__ of the plaintext bit, i.e. a new
+ciphertext for the same plaintext. Now if the decryption circuit has a
+small enough depth, then the amount of noise in the new ciphertext can
+be actually smaller than in the original plaintext, hence a ciphertext refresh.
 
 However the previous decryption algorithm m=(c mod p) mod 2 does not
 have a small depth, therefore the decryption procedure must be "squashed" so
@@ -122,10 +122,10 @@ WHAT IS A COMPRESSED PUBLIC-KEY ?
 ---------------------------------
 
 In DGHV the ciphertext size must be huge to prevent attacks based on
-lattice reduction algorithms; at least 10^10 bits. The secret p is
+lattice reduction algorithms; at least 10^7 bits. The secret p is
 comparatively smaller, roughly 2000 bits. Since roughly 10^4
 ciphertexts xi must be included in the public-key, that would give a
-public-key size of 10^14 bits, i.e. 12.5 TB.
+public-key size of 10^11 bits, i.e. 12.5 GB.
 
 To reduce the public-key size we implement the following technique
 described in [1]. Instead of generating xi as xi=qi*p+2*ri, one first
